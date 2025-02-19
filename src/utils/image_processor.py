@@ -68,8 +68,51 @@ class IDImageProcessor:
             # Agregar más lógica de parsing según el formato específico del ID
                 
         return id_data
+    
+    # Añadir estos métodos a tu clase IDImageProcessor
 
-    def to_dataframe(self, id_data):
+def enhance_image(self, image):
+    """
+    Mejora la calidad de la imagen para mejor reconocimiento de texto
+    """
+    # Incrementar el contraste
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+    cl = clahe.apply(l)
+    enhanced = cv2.merge((cl,a,b))
+    enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+    
+    return enhanced
+
+def deskew_image(self, image):
+    """
+    Corrige la inclinación de la imagen
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    lines = cv2.HoughLines(edges, 1, np.pi/180, 100)
+    
+    if lines is not None:
+        angle = 0
+        for rho, theta in lines[0]:
+            angle = theta * 180 / np.pi
+            if angle < 45:
+                angle = angle
+            else:
+                angle = angle - 90
+                
+        (h, w) = image.shape[:2]
+        center = (w // 2, h // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        rotated = cv2.warpAffine(image, M, (w, h), 
+                                flags=cv2.INTER_CUBIC, 
+                                borderMode=cv2.BORDER_REPLICATE)
+        return rotated
+    
+    return image
+
+def to_dataframe(self, id_data):
         """
         Convierte los datos extraídos en un DataFrame
         """
