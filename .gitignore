@@ -33,6 +33,7 @@ ENV/
 
 # Input Images
 input_images/
+output/
 
 # Logs
 *.log

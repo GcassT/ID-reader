@@ -1,49 +1,58 @@
-from utils.image_processor import IDImageProcessor
-from utils.logger import logger
+from datetime import datetime
 import os
-from config.settings import INPUT_IMAGE_DIR
-import pandas as pd
+from utils.image_processor import IDImageProcessor
 
 def main():
-    logger.info("Iniciando procesamiento de imágenes")
+    # Mostrar información de ejecución
+    print(f"Current Date and Time (UTC): {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Current User's Login: {os.getenv('USERNAME', 'GcassT')}")
+    print("\n" + "="*50 + "\n")
     
+    # Inicializar el procesador de imágenes
     processor = IDImageProcessor()
-    all_data = []
     
-    images = [f for f in os.listdir(INPUT_IMAGE_DIR) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    
-    if not images:
-        logger.warning("No se encontraron imágenes para procesar")
+    # Listar todas las imágenes en el directorio de entrada
+    input_dir = 'input_images'
+    if not os.path.exists(input_dir):
+        os.makedirs(input_dir)
+        print(f"Creado directorio: {input_dir}")
+        print("Por favor, coloca las imágenes de ID en la carpeta 'input_images'")
         return
         
-    logger.info(f"Se encontraron {len(images)} imágenes para procesar")
+    images = [f for f in os.listdir(input_dir) if f.endswith(('.jpg', '.jpeg', '.png'))]
+    
+    if not images:
+        print("No se encontraron imágenes en el directorio input_images/")
+        return
+        
+    print(f"Se encontraron {len(images)} imágenes para procesar")
     
     for image_name in images:
-        logger.info(f"Procesando imagen: {image_name}")
-        image_path = os.path.join(INPUT_IMAGE_DIR, image_name)
+        print(f"\nProcesando imagen: {image_name}")
+        image_path = os.path.join(input_dir, image_name)
         
         try:
+            # Procesar la imagen y extraer datos
             id_data = processor.extract_text(image_path)
-            df = processor.to_dataframe(id_data)
-            all_data.append(df)
             
-            logger.info(f"Datos extraídos exitosamente de {image_name}")
+            # Convertir a DataFrame
+            df = processor.to_dataframe(id_data)
+            
+            # Mostrar resultados
+            print("\nDatos extraídos del ID:")
+            print(df)
+            
+            # Guardar resultados
+            output_dir = 'output'
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            
+            output_file = f"output/processed_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+            df.to_csv(output_file, index=False)
+            print(f"\nResultados guardados en: {output_file}")
             
         except Exception as e:
-            logger.error(f"Error procesando {image_name}: {str(e)}")
-    
-    if all_data:
-        # Combinar todos los resultados
-        final_df = pd.concat(all_data, ignore_index=True)
-        
-        # Guardar resultados
-        output_path = 'output/processed_ids.csv'
-        os.makedirs('output', exist_ok=True)
-        final_df.to_csv(output_path, index=False)
-        
-        logger.info(f"Resultados guardados en {output_path}")
-        print("\nResumen de datos procesados:")
-        print(final_df)
+            print(f"Error al procesar la imagen {image_name}: {str(e)}")
 
 if __name__ == "__main__":
     main()

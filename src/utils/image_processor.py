@@ -3,50 +3,19 @@ import pytesseract
 import numpy as np
 from PIL import Image
 import pandas as pd
-from ..config.settings import TESSERACT_CMD
+import os
+from dotenv import load_dotenv
+import re
+from datetime import datetime
 
 class IDImageProcessor:
     def __init__(self):
-        pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
-        
-    def preprocess_image(self, image):
-        """
-        Preprocesa la imagen para mejorar la extracción de texto
-        """
-        # Convertir a escala de grises
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # Aplicar threshold adaptativo
-        thresh = cv2.adaptiveThreshold(
-            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-            cv2.THRESH_BINARY, 11, 2
-        )
-        
-        # Reducir ruido
-        processed = cv2.medianBlur(thresh, 3)
-        
-        return processed
-
-    def extract_text(self, image_path):
-        """
-        Extrae texto de la imagen del ID
-        """
-        # Leer imagen
-        image = cv2.imread(image_path)
-        if image is None:
-            raise ValueError(f"No se pudo cargar la imagen: {image_path}")
-
-        # Preprocesar imagen
-        processed_image = self.preprocess_image(image)
-        
-        # Extraer texto
-        text = pytesseract.image_to_string(processed_image, lang='spa')
-        
-        return self.parse_id_data(text)
+        # ... (mantener el código de inicialización existente) ...
+        pass
 
     def parse_id_data(self, text):
         """
-        Analiza el texto extraído y lo estructura en un diccionario
+        Analiza el texto extraído de una cédula colombiana
         """
         # Inicializar diccionario de datos
         id_data = {
@@ -57,63 +26,118 @@ class IDImageProcessor:
             'fecha_expedicion': None
         }
         
-        # Procesar el texto línea por línea
-        lines = text.split('\n')
+        # Convertir el texto a líneas y eliminar espacios en blanco
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        
+        print("Texto extraído de la imagen:")
+        print("-------------------")
+        print(text)
+        print("-------------------")
+
+        # Patrones para identificar campos
+        patterns = {
+            'numero_id': r'\b\d{8,11}\b',  # 8-11 dígitos consecutivos
+            'fecha': r'\b\d{1,2}-[A-Za-z]{3,4}-\d{4}\b',  # formato: DD-MMM-YYYY
+        }
+
+        # Buscar número de cédula
         for line in lines:
-            line = line.strip()
-            # Aquí agregaremos la lógica para detectar cada campo
-            # Este es un ejemplo básico que deberás adaptar según el formato de tus IDs
-            if line.isdigit() and len(line) > 8:  # Posible número de ID
-                id_data['numero_id'] = line
-            # Agregar más lógica de parsing según el formato específico del ID
-                
+            if re.search(patterns['numero_id'], line):
+                id_data['numero_id'] = re.search(patterns['numero_id'], line).group()
+                break
+
+        # Variables para almacenar nombres y apellidos temporalmente
+        nombres_temp = []
+        apellidos_temp = []
+        found_nombres = False
+
+        for i, line in enumerate(lines):
+            # Ignorar líneas comunes que no son relevantes
+            if any(keyword in line.upper() for keyword in ['REPUBLICA', 'COLOMBIA', 'CEDULA', 'IDENTIFICACION']):
+                continue
+
+            # Buscar fechas
+            fecha_match = re.search(patterns['fecha'], line)
+            if fecha_match:
+                fecha = fecha_match.group()
+                if 'FECHA DE NACIMIENTO' in line.upper() or 'NACIMIENTO' in line.upper():
+                    id_data['fecha_nacimiento'] = fecha
+                elif 'FECHA DE EXPEDICION' in line.upper() or 'EXPEDICION' in line.upper():
+                    id_data['fecha_expedicion'] = fecha
+                continue
+
+            # Procesar nombres y apellidos
+            if 'APELLIDOS' in line.upper() or found_nombres:
+                found_nombres = True
+                current_line = line.upper().replace('APELLIDOS', '').replace('NOMBRES', '').strip()
+                if current_line:
+                    if not id_data['apellidos']:
+                        apellidos_temp.append(current_line)
+                    elif not id_data['nombres']:
+                        nombres_temp.append(current_line)
+
+        # Combinar nombres y apellidos
+        if apellidos_temp:
+            id_data['apellidos'] = ' '.join(apellidos_temp)
+        if nombres_temp:
+            id_data['nombres'] = ' '.join(nombres_temp)
+
         return id_data
-    
-    # Añadir estos métodos a tu clase IDImageProcessor
 
-def enhance_image(self, image):
-    """
-    Mejora la calidad de la imagen para mejor reconocimiento de texto
-    """
-    # Incrementar el contraste
-    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-    cl = clahe.apply(l)
-    enhanced = cv2.merge((cl,a,b))
-    enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
-    
-    return enhanced
-
-def deskew_image(self, image):
-    """
-    Corrige la inclinación de la imagen
-    """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
-    lines = cv2.HoughLines(edges, 1, np.pi/180, 100)
-    
-    if lines is not None:
-        angle = 0
-        for rho, theta in lines[0]:
-            angle = theta * 180 / np.pi
-            if angle < 45:
-                angle = angle
-            else:
-                angle = angle - 90
-                
-        (h, w) = image.shape[:2]
-        center = (w // 2, h // 2)
-        M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        rotated = cv2.warpAffine(image, M, (w, h), 
-                                flags=cv2.INTER_CUBIC, 
-                                borderMode=cv2.BORDER_REPLICATE)
-        return rotated
-    
-    return image
-
-def to_dataframe(self, id_data):
+    def preprocess_image(self, image):
         """
-        Convierte los datos extraídos en un DataFrame
+        Mejora el preprocesamiento de la imagen para mejor OCR
         """
-        return pd.DataFrame([id_data])
+        # Convertir a escala de grises
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Aumentar el contraste
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        gray = clahe.apply(gray)
+        
+        # Eliminar ruido
+        denoised = cv2.fastNlMeansDenoising(gray)
+        
+        # Binarización adaptativa
+        thresh = cv2.adaptiveThreshold(
+            denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY, 11, 2
+        )
+        
+        # Dilatación para mejorar la conectividad de los caracteres
+        kernel = np.ones((1,1), np.uint8)
+        dilated = cv2.dilate(thresh, kernel, iterations=1)
+        
+        return dilated
+
+    def extract_text(self, image_path):
+        """
+        Extrae texto de la imagen con configuración mejorada
+        """
+        # Leer imagen
+        image = cv2.imread(image_path)
+        if image is None:
+            raise ValueError(f"No se pudo cargar la imagen: {image_path}")
+
+        # Preprocesar imagen
+        processed_image = self.preprocess_image(image)
+        
+        # Guardar imagen procesada para debug
+        debug_path = 'output/processed_image.png'
+        os.makedirs('output', exist_ok=True)
+        cv2.imwrite(debug_path, processed_image)
+        print(f"Imagen procesada guardada en: {debug_path}")
+
+        # Configuración de OCR
+        custom_config = r'--oem 3 --psm 3'
+        try:
+            text = pytesseract.image_to_string(
+                processed_image, 
+                lang='spa',
+                config=custom_config
+            )
+        except Exception as e:
+            print(f"Error en OCR: {str(e)}")
+            return None
+        
+        return self.parse_id_data(text)
