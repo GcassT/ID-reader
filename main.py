@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
 import os
 import pandas as pd
 from tqdm import tqdm
 from app.core.image_processor import ImageProcessor
-from app.core.data_extractor import DataExtractor
+from app.core.DataExtractor import DataExtractor
 from app.utils.helpers import get_image_files, print_execution_info
 from app.config import INPUT_DIR, OUTPUT_DIR
 
