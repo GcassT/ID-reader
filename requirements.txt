@@ -1,6 +1,13 @@
-python-dotenv==1.0.0
-opencv-python==4.8.0
+# Procesamiento de imágenes
+opencv-python==4.8.0.76
 pytesseract==0.3.10
+pillow==10.0.0
+imutils==0.5.4
+
+# Análisis de datos
 pandas==2.0.3
 numpy==1.24.3
-pillow==10.0.0
+
+# Utilidades
+python-dotenv==1.0.0
+tqdm==4.65.0
